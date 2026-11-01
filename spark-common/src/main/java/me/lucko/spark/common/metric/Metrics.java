@@ -18,10 +18,9 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package me.lucko.spark.common.monitor;
+package me.lucko.spark.common.metric;
 
 import me.lucko.spark.common.sampler.window.WindowStatisticsCollector;
-import me.lucko.spark.common.util.MetricSeries;
 import me.lucko.spark.common.util.TimeUtil;
 import me.lucko.spark.proto.SparkProtos;
 
@@ -36,8 +35,7 @@ import java.time.Duration;
  *
  * <p>These metrics are recorded at a higher interval than those collected by {@link WindowStatisticsCollector}.</p>
  */
-public enum Metrics {
-    ;
+public class Metrics {
 
     /** The retention period of the metrics series. */
     private static final Duration RETENTION = Duration.ofHours(1);
@@ -55,22 +53,41 @@ public enum Metrics {
      */
     private static final long START_RECORDING_MILLIS = TimeUtil.monotonicCurrentTimeMillis() + INTERVAL_MILLIS;
 
-    public static final MetricSeries.Doubles TPS = new MetricSeries.Doubles(RETENTION, INITIAL_CAPACITY);
-    public static final MetricSeries.Averages TICK_DURATION = new MetricSeries.Averages(RETENTION, INITIAL_CAPACITY);
+    // static metrics series for CPU and memory usage - JVM-wide metrics, not per instance
     public static final MetricSeries.Doubles CPU_USAGE_PROCESS = new MetricSeries.Doubles(RETENTION, INITIAL_CAPACITY);
     public static final MetricSeries.Doubles CPU_USAGE_SYSTEM = new MetricSeries.Doubles(RETENTION, INITIAL_CAPACITY);
     public static final MetricSeries.MemoryUsages MEMORY_USAGE_HEAP = new MetricSeries.MemoryUsages(RETENTION, INITIAL_CAPACITY);
     public static final MetricSeries.MemoryUsages MEMORY_USAGE_NON_HEAP = new MetricSeries.MemoryUsages(RETENTION, INITIAL_CAPACITY);
     public static final MetricSeries.Doubles MEMORY_ALLOCATION = new MetricSeries.Doubles(RETENTION, INITIAL_CAPACITY);
-    public static final MetricSeries.WorldInfo WORLD_INFO = new MetricSeries.WorldInfo(RETENTION, INITIAL_CAPACITY);
-    public static final MetricSeries.Averages PLAYER_PING = new MetricSeries.Averages(RETENTION, INITIAL_CAPACITY);
 
-    public static boolean shouldRecordTps() {
-        return shouldRecord(TPS, TimeUtil.monotonicCurrentTimeMillis());
+    // metrics series for TPS, tick duration, world info, and player ping - specific to the instance
+    private final MetricSeries.Doubles tps = new MetricSeries.Doubles(RETENTION, INITIAL_CAPACITY);
+    private final MetricSeries.Averages tickDuration = new MetricSeries.Averages(RETENTION, INITIAL_CAPACITY);
+    private final MetricSeries.WorldInfo worldInfo = new MetricSeries.WorldInfo(RETENTION, INITIAL_CAPACITY);
+    private final MetricSeries.Averages playerPing = new MetricSeries.Averages(RETENTION, INITIAL_CAPACITY);
+
+    public MetricSeries.Doubles tps() {
+        return this.tps;
     }
 
-    public static boolean shouldRecordTickDuration() {
-        return shouldRecord(TICK_DURATION, TimeUtil.monotonicCurrentTimeMillis());
+    public MetricSeries.Averages tickDuration() {
+        return this.tickDuration;
+    }
+
+    public MetricSeries.WorldInfo worldInfo() {
+        return this.worldInfo;
+    }
+
+    public MetricSeries.Averages playerPing() {
+        return this.playerPing;
+    }
+
+    public boolean shouldRecordTps() {
+        return shouldRecord(this.tps, TimeUtil.monotonicCurrentTimeMillis());
+    }
+
+    public boolean shouldRecordTickDuration() {
+        return shouldRecord(this.tickDuration, TimeUtil.monotonicCurrentTimeMillis());
     }
 
     public static boolean shouldRecordCpuUsageProcess(long timeNow) {
@@ -99,14 +116,8 @@ public enum Metrics {
      * between the guard and the export, and the profile then carried a series claiming to start
      * at the epoch with no values in it.</p>
      */
-    public static SparkProtos.Metrics exportProto() {
+    public SparkProtos.Metrics exportProto() {
         SparkProtos.Metrics.Builder builder = SparkProtos.Metrics.newBuilder();
-
-        SparkProtos.DoubleMetricSeries tps = TPS.toProto();
-        if (tps != null) builder.setTps(tps);
-
-        SparkProtos.AveragesMetricSeries tickDuration = TICK_DURATION.toProto();
-        if (tickDuration != null) builder.setTickDuration(tickDuration);
 
         SparkProtos.DoubleMetricSeries cpuProcess = CPU_USAGE_PROCESS.toProto();
         if (cpuProcess != null) builder.setCpuUsageProcess(cpuProcess);
@@ -123,10 +134,16 @@ public enum Metrics {
         SparkProtos.DoubleMetricSeries allocation = MEMORY_ALLOCATION.toProto();
         if (allocation != null) builder.setMemoryAllocation(allocation);
 
-        SparkProtos.WorldInfoMetricSeries worldInfo = WORLD_INFO.toProto();
+        SparkProtos.DoubleMetricSeries tps = this.tps.toProto();
+        if (tps != null) builder.setTps(tps);
+
+        SparkProtos.AveragesMetricSeries tickDuration = this.tickDuration.toProto();
+        if (tickDuration != null) builder.setTickDuration(tickDuration);
+
+        SparkProtos.WorldInfoMetricSeries worldInfo = this.worldInfo.toProto();
         if (worldInfo != null) builder.setWorldInfo(worldInfo);
 
-        SparkProtos.AveragesMetricSeries ping = PLAYER_PING.toProto();
+        SparkProtos.AveragesMetricSeries ping = this.playerPing.toProto();
         if (ping != null) builder.setPlayerPing(ping);
 
         return builder.build();

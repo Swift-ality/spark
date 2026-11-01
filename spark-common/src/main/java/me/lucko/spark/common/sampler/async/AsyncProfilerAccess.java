@@ -63,6 +63,8 @@ public class AsyncProfilerAccess {
     private final ProfilingEvent profilingEvent;
     /** The event to use for allocation profiling */
     private final ProfilingEvent allocationProfilingEvent;
+    /** The event to use for lock profiling */
+    private final ProfilingEvent lockProfilingEvent;
 
     /** If profiler is null, contains the reason why setup failed */
     private final Exception setupException;
@@ -71,6 +73,7 @@ public class AsyncProfilerAccess {
         AsyncProfiler profiler;
         ProfilingEvent profilingEvent = null;
         ProfilingEvent allocationProfilingEvent = null;
+        ProfilingEvent lockProfilingEvent = null;
         Exception setupException = null;
 
         try {
@@ -80,6 +83,11 @@ public class AsyncProfilerAccess {
             // allocation profiler
             if (supportedEvents.contains(ProfilingEvent.ALLOC)) {
                 allocationProfilingEvent = ProfilingEvent.ALLOC;
+            }
+
+            // lock profiler
+            if (supportedEvents.contains(ProfilingEvent.LOCK)) {
+                lockProfilingEvent = ProfilingEvent.LOCK;
             }
 
             // normal profiler
@@ -97,6 +105,7 @@ public class AsyncProfilerAccess {
         this.profiler = profiler;
         this.profilingEvent = profilingEvent;
         this.allocationProfilingEvent = allocationProfilingEvent;
+        this.lockProfilingEvent = lockProfilingEvent;
         this.setupException = setupException;
     }
 
@@ -109,6 +118,7 @@ public class AsyncProfilerAccess {
         this.profiler = null;
         this.profilingEvent = profilingEvent;
         this.allocationProfilingEvent = allocationProfilingEvent;
+        this.lockProfilingEvent = null;
         this.setupException = null;
     }
 
@@ -125,6 +135,10 @@ public class AsyncProfilerAccess {
 
     public ProfilingEvent getAllocationProfilingEvent() {
         return this.allocationProfilingEvent;
+    }
+
+    public ProfilingEvent getLockProfilingEvent() {
+        return this.lockProfilingEvent;
     }
 
     public boolean checkSupported(SparkPlatform platform) {
@@ -183,6 +197,14 @@ public class AsyncProfilerAccess {
 
         if (!supported) {
             platform.getPlugin().log(Level.WARNING, "Native memory leak profiling requires async-profiler 4.0 or newer.");
+        }
+        return supported;
+    }
+
+    public boolean checkLockProfilingSupported(SparkPlatform platform) {
+        boolean supported = this.lockProfilingEvent != null;
+        if (!supported && this.profiler != null) {
+            platform.getPlugin().log(Level.WARNING, "The lock profiling mode is not supported on your system.");
         }
         return supported;
     }
@@ -262,7 +284,8 @@ public class AsyncProfilerAccess {
 
     public enum ProfilingEvent {
         WALL(Events.WALL),
-        ALLOC(Events.ALLOC);
+        ALLOC(Events.ALLOC),
+        LOCK(Events.LOCK);
 
         private final String id;
 

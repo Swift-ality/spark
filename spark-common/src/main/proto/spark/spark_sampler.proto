@@ -179,6 +179,7 @@ message SamplerMetadata {
     // fork - high values so upstream can keep taking 2, 3, ... without colliding
     NATIVE_MEMORY = 100;
     COMBINED = 101;
+    LOCK = 2;
   }
 
   enum SamplerEngine {

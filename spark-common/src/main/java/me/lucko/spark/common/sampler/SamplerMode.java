@@ -57,13 +57,22 @@ public enum SamplerMode {
             },
             0, // record every malloc
             SamplerMetadata.SamplerMode.NATIVE_MEMORY
+    ),
+
+    LOCK(
+            value -> {
+                // convert the duration from nanoseconds -> milliseconds
+                return value / 1000000d;
+            },
+            0.01, // ms (10 microseconds)
+            SamplerMetadata.SamplerMode.LOCK
     );
 
     private final LongToDoubleFunction valueTransformer;
-    private final int defaultInterval;
+    private final double defaultInterval;
     private final SamplerMetadata.SamplerMode proto;
 
-    SamplerMode(LongToDoubleFunction valueTransformer, int defaultInterval, SamplerMetadata.SamplerMode proto) {
+    SamplerMode(LongToDoubleFunction valueTransformer, double defaultInterval, SamplerMetadata.SamplerMode proto) {
         this.valueTransformer = valueTransformer;
         this.defaultInterval = defaultInterval;
         this.proto = proto;
@@ -73,7 +82,7 @@ public enum SamplerMode {
         return this.valueTransformer;
     }
 
-    public int defaultInterval() {
+    public double defaultInterval() {
         return this.defaultInterval;
     }
 

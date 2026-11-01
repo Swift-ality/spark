@@ -23,10 +23,11 @@ package me.lucko.spark.common.sampler.async;
 import com.google.common.collect.ImmutableList;
 import me.lucko.spark.common.sampler.SamplerMode;
 import me.lucko.spark.common.sampler.async.AsyncProfilerAccess.ProfilingEvent;
+import me.lucko.spark.common.sampler.async.jfr.JfrReader;
 import me.lucko.spark.common.sampler.async.jfr.JfrReader.AllocationSample;
+import me.lucko.spark.common.sampler.async.jfr.JfrReader.ContendedLock;
 import me.lucko.spark.common.sampler.async.jfr.JfrReader.Event;
 import me.lucko.spark.common.sampler.async.jfr.JfrReader.ExecutionSample;
-import me.lucko.spark.common.sampler.async.jfr.JfrReader; // fork
 
 import java.util.Collection;
 import java.util.Objects;
@@ -56,10 +57,11 @@ public interface SampleCollector<E extends Event> {
     /**
      * Gets the measurements for a given event
      *
+     * @param reader the reader the event was read from
      * @param event the event
      * @return the measurement
      */
-    long measure(E event);
+    long measure(JfrReader reader, E event);
 
     /**
      * Gets the mode for the collector.
@@ -90,10 +92,10 @@ public interface SampleCollector<E extends Event> {
      * Sample collector for execution (cpu time) profiles.
      */
     final class Execution implements SampleCollector<ExecutionSample> {
-        private final int interval; // time in microseconds
+        private final int intervalMicroseconds; // time in microseconds
 
-        public Execution(int interval) {
-            this.interval = interval;
+        public Execution(int intervalMicroseconds) {
+            this.intervalMicroseconds = intervalMicroseconds;
         }
 
         @Override
@@ -103,7 +105,7 @@ public interface SampleCollector<E extends Event> {
 
             return ImmutableList.of(
                     "event=" + event,
-                    "interval=" + this.interval + "us"
+                    "interval=" + this.intervalMicroseconds + "us"
             );
         }
 
@@ -113,8 +115,8 @@ public interface SampleCollector<E extends Event> {
         }
 
         @Override
-        public long measure(ExecutionSample event) {
-            return event.value() * this.interval;
+        public long measure(JfrReader reader, ExecutionSample event) {
+            return event.value() * this.intervalMicroseconds;
         }
 
         @Override
@@ -159,7 +161,7 @@ public interface SampleCollector<E extends Event> {
         }
 
         @Override
-        public long measure(AllocationSample event) {
+        public long measure(JfrReader reader, AllocationSample event) {
             return event.value();
         }
 
@@ -168,6 +170,56 @@ public interface SampleCollector<E extends Event> {
             return SamplerMode.ALLOCATION;
         }
     }
+
+    /**
+     * Sample collector for lock (contention) profiles.
+     *
+     * <p>Measures the time threads spend waiting to enter contended monitors
+     * (synchronized blocks/methods) or parked waiting for
+     * {@code java.util.concurrent} locks.</p>
+     */
+    final class Lock implements SampleCollector<ContendedLock> {
+        private final int thresholdMicroseconds; // time in microseconds
+
+        public Lock(int thresholdMicroseconds) {
+            this.thresholdMicroseconds = thresholdMicroseconds;
+        }
+
+        @Override
+        public Collection<String> initArguments(AsyncProfilerAccess access) {
+            ProfilingEvent event = access.getLockProfilingEvent();
+            Objects.requireNonNull(event, "event");
+
+            // async-profiler expects the lock threshold in nanoseconds
+            long thresholdNanos = this.thresholdMicroseconds * 1000L;
+
+            return ImmutableList.of(
+                    "event=" + event,
+                    "lock=" + thresholdNanos
+            );
+        }
+
+        @Override
+        public Class<ContendedLock> eventClass() {
+            return ContendedLock.class;
+        }
+
+        @Override
+        public long measure(JfrReader reader, ContendedLock event) {
+            // the duration is recorded in ticks, convert to nanoseconds
+            long ticksPerSec = reader.ticksPerSec;
+            if (ticksPerSec <= 0 || ticksPerSec == 1_000_000_000L) {
+                return event.value();
+            }
+            return (long) (event.value() * (1_000_000_000d / ticksPerSec));
+        }
+
+        @Override
+        public SamplerMode getMode() {
+            return SamplerMode.LOCK;
+        }
+    }
+
 
     /**
      * Sample collector for Java HEAP leaks - objects that survived garbage collection. // fork
@@ -224,7 +276,7 @@ public interface SampleCollector<E extends Event> {
         }
 
         @Override
-        public long measure(JfrReader.LiveObject event) {
+        public long measure(JfrReader reader, JfrReader.LiveObject event) {
             return event.allocationSize;
         }
 
@@ -278,7 +330,7 @@ public interface SampleCollector<E extends Event> {
         }
 
         @Override
-        public long measure(JfrReader.MallocEvent event) {
+        public long measure(JfrReader reader, JfrReader.MallocEvent event) {
             return event.size;
         }
 
