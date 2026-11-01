@@ -33,7 +33,7 @@ import net.minecraft.server.packs.repository.PackSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.gamerules.GameRule;
+import net.minecraft.world.level.GameRules;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -100,11 +100,11 @@ public abstract class MinecraftWorldInfoProvider implements WorldInfoProvider {
                 Long2ObjectOpenHashMap<MinecraftChunkInfo> worldInfos = new Long2ObjectOpenHashMap<>();
 
                 for (Entity entity : level.getAllEntities()) {
-                    MinecraftChunkInfo info = worldInfos.computeIfAbsent(entity.chunkPosition().pack(), MinecraftChunkInfo::new);
+                    MinecraftChunkInfo info = worldInfos.computeIfAbsent(entity.chunkPosition().toLong(), MinecraftChunkInfo::new);
                     info.entityCounts.increment(entity.getType());
                 }
 
-                data.put(level.dimension().identifier().getPath(), List.copyOf(worldInfos.values()));
+                data.put(level.dimension().location().getPath(), List.copyOf(worldInfos.values()));
             }
 
             return data;
@@ -116,21 +116,20 @@ public abstract class MinecraftWorldInfoProvider implements WorldInfoProvider {
             Iterable<ServerLevel> worlds = this.server.getAllLevels();
 
             for (ServerLevel level : worlds) {
-                String levelName = level.dimension().identifier().getPath();
+                String levelName = level.dimension().location().getPath();
 
-                level.getGameRules().availableRules().forEach(rule -> {
-                    String defaultValue = gameRuleDefaultValue(rule);
-                    data.putDefault(rule.id(), defaultValue);
+                GameRules.visitGameRuleTypes(new GameRules.GameRuleTypeVisitor() {
+                    @Override
+                    public <T extends GameRules.Value<T>> void visit(GameRules.Key<T> key, GameRules.Type<T> type) {
+                        String defaultValue = type.createRule().serialize();
+                        data.putDefault(key.getId(), defaultValue);
 
-                    String value = level.getGameRules().getAsString(rule);
-                    data.put(rule.id(), levelName, value);
+                        String value = level.getGameRules().getRule(key).serialize();
+                        data.put(key.getId(), levelName, value);
+                    }
                 });
             }
             return data;
-        }
-
-        private static <T> String gameRuleDefaultValue(GameRule<T> rule) {
-            return rule.serialize(rule.defaultValue());
         }
 
         @Override
@@ -174,11 +173,11 @@ public abstract class MinecraftWorldInfoProvider implements WorldInfoProvider {
             Long2ObjectOpenHashMap<MinecraftChunkInfo> worldInfos = new Long2ObjectOpenHashMap<>();
 
             for (Entity entity : getAllEntities(level)) {
-                MinecraftChunkInfo info = worldInfos.computeIfAbsent(entity.chunkPosition().pack(), MinecraftChunkInfo::new);
+                MinecraftChunkInfo info = worldInfos.computeIfAbsent(entity.chunkPosition().toLong(), MinecraftChunkInfo::new);
                 info.entityCounts.increment(entity.getType());
             }
 
-            data.put(level.dimension().identifier().getPath(), List.copyOf(worldInfos.values()));
+            data.put(level.dimension().location().getPath(), List.copyOf(worldInfos.values()));
             return data;
         }
 

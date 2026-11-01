@@ -38,7 +38,7 @@ public class MinecraftPlayerPingProvider implements PlayerPingProvider {
     public Map<String, Integer> poll() {
         ImmutableMap.Builder<String, Integer> builder = ImmutableMap.builder();
         for (ServerPlayer player : this.server.getPlayerList().getPlayers()) {
-            builder.put(player.getGameProfile().name(), player.connection.latency());
+            builder.put(player.getGameProfile().getName(), player.latency);
         }
         return builder.build();
     }

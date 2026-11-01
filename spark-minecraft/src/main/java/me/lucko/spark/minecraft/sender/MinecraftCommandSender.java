@@ -20,14 +20,10 @@
 
 package me.lucko.spark.minecraft.sender;
 
-import com.google.gson.JsonParseException;
-import com.mojang.serialization.JsonOps;
 import me.lucko.spark.common.command.sender.AbstractCommandSender;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
 import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.network.chat.ComponentSerialization;
 
 public abstract class MinecraftCommandSender extends AbstractCommandSender<CommandSourceStack> {
     public MinecraftCommandSender(CommandSourceStack source) {
@@ -36,10 +32,9 @@ public abstract class MinecraftCommandSender extends AbstractCommandSender<Comma
 
     @Override
     public void sendMessage(Component message) {
-        net.minecraft.network.chat.Component component = ComponentSerialization.CODEC.decode(
-                RegistryAccess.EMPTY.createSerializationContext(JsonOps.INSTANCE),
+        net.minecraft.network.chat.Component component = net.minecraft.network.chat.Component.Serializer.fromJson(
                 GsonComponentSerializer.gson().serializeToTree(message)
-        ).getOrThrow(JsonParseException::new).getFirst();
+        );
         this.delegate.sendSystemMessage(component);
     }
 }

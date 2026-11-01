@@ -20,15 +20,11 @@
 
 package me.lucko.spark.fabric;
 
-import com.google.gson.JsonParseException;
-import com.mojang.serialization.JsonOps;
 import me.lucko.spark.common.command.sender.AbstractCommandSender;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
 import net.minecraft.client.multiplayer.ClientSuggestionProvider;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.network.chat.ComponentSerialization;
 
 import java.util.UUID;
 
@@ -43,7 +39,7 @@ public class FabricClientCommandSender extends AbstractCommandSender<FabricClien
 
     @Override
     public String getName() {
-        return this.delegate.getPlayer().getGameProfile().name();
+        return this.delegate.getPlayer().getGameProfile().getName();
     }
 
     @Override
@@ -53,10 +49,9 @@ public class FabricClientCommandSender extends AbstractCommandSender<FabricClien
 
     @Override
     public void sendMessage(Component message) {
-        net.minecraft.network.chat.Component component = ComponentSerialization.CODEC.decode(
-                RegistryAccess.EMPTY.createSerializationContext(JsonOps.INSTANCE),
+        net.minecraft.network.chat.Component component = net.minecraft.network.chat.Component.Serializer.fromJson(
                 GsonComponentSerializer.gson().serializeToTree(message)
-        ).getOrThrow(JsonParseException::new).getFirst();
+        );
         this.delegate.sendFeedback(component);
     }
 

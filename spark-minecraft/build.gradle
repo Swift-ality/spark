@@ -1,10 +1,10 @@
 plugins {
-    id 'net.fabricmc.fabric-loom'
+    id 'net.fabricmc.fabric-loom-remap'
 }
 
 tasks.withType(JavaCompile) {
-    // override, compile targeting J25
-    options.release = 25
+    // override, compile targeting J17
+    options.release = 17
 }
 
 repositories {
@@ -13,7 +13,8 @@ repositories {
 }
 
 dependencies {
-    minecraft 'com.mojang:minecraft:26.3'
+    minecraft 'com.mojang:minecraft:1.20.1'
+    mappings loom.officialMojangMappings()
 
     implementation(project(':spark-common')) {
         // use the java11+ bytesocks client instead
@@ -23,4 +24,3 @@ dependencies {
 
     implementation 'me.lucko:bytesocks-java-client-j11:1.0-SNAPSHOT'
 }
-

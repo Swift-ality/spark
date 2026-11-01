@@ -20,9 +20,7 @@
 
 package me.lucko.spark.fabric.placeholder;
 
-import com.google.gson.JsonParseException;
-import com.mojang.serialization.JsonOps;
-import eu.pb4.placeholders.api.Placeholder;
+import eu.pb4.placeholders.api.PlaceholderHandler;
 import eu.pb4.placeholders.api.PlaceholderContext;
 import eu.pb4.placeholders.api.PlaceholderResult;
 import eu.pb4.placeholders.api.Placeholders;
@@ -30,9 +28,7 @@ import me.lucko.spark.common.SparkPlatform;
 import me.lucko.spark.common.util.SparkPlaceholder;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.network.chat.ComponentSerialization;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
 public enum SparkFabricPlaceholderApi {
@@ -40,14 +36,14 @@ public enum SparkFabricPlaceholderApi {
 
     public static void register(SparkPlatform platform) {
         for (SparkPlaceholder placeholder : SparkPlaceholder.values()) {
-            Placeholders.registerCommon(
-                    Identifier.fromNamespaceAndPath("spark", placeholder.getName()),
+            Placeholders.register(
+                    new ResourceLocation("spark", placeholder.getName()),
                     new Handler(platform, placeholder)
             );
         }
     }
 
-    private record Handler(SparkPlatform platform, SparkPlaceholder placeholder) implements Placeholder.Handler<PlaceholderContext, String> {
+    private record Handler(SparkPlatform platform, SparkPlaceholder placeholder) implements PlaceholderHandler {
         @Override
         public PlaceholderResult onPlaceholderRequest(PlaceholderContext context, @Nullable String argument) {
             return toResult(this.placeholder.resolve(this.platform, argument));
@@ -60,10 +56,9 @@ public enum SparkFabricPlaceholderApi {
         }
 
         private static net.minecraft.network.chat.Component toText(Component component) {
-            return ComponentSerialization.CODEC.decode(
-                    RegistryAccess.EMPTY.createSerializationContext(JsonOps.INSTANCE),
+            return net.minecraft.network.chat.Component.Serializer.fromJson(
                     GsonComponentSerializer.gson().serializeToTree(component)
-            ).getOrThrow(JsonParseException::new).getFirst();
+            );
         }
     }
 

@@ -1,11 +1,13 @@
+import net.fabricmc.loom.task.RemapJarTask
+
 plugins {
-    id 'net.fabricmc.fabric-loom'
+    id 'net.fabricmc.fabric-loom-remap'
     id 'com.gradleup.shadow'
 }
 
 tasks.withType(JavaCompile).configureEach {
-    // override, compile targeting J25
-    options.release = 25
+    // override, compile targeting J17
+    options.release = 17
 }
 
 repositories {
@@ -23,14 +25,13 @@ configurations {
     shade
     implementation.extendsFrom shade
 
-    jarInJar
-    implementation.extendsFrom jarInJar
 }
 
 dependencies {
     // https://modmuss50.me/fabric.html
-    minecraft 'com.mojang:minecraft:26.3'
-    implementation 'net.fabricmc:fabric-loader:0.20.1'
+    minecraft 'com.mojang:minecraft:1.20.1'
+    mappings loom.officialMojangMappings()
+    modImplementation 'net.fabricmc:fabric-loader:0.20.1'
 
     Set<String> apiModules = [
             "fabric-api-base",
@@ -40,11 +41,11 @@ dependencies {
 
     // Add each module as a dependency
     apiModules.forEach {
-        implementation(fabricApi.module(it, '0.165.0+26.3'))
+        modImplementation(fabricApi.module(it, '0.92.6+1.20.1'))
     }
 
-    jarInJar 'me.lucko:fabric-permissions-api:0.7.0'
-    implementation 'eu.pb4:placeholder-api:3.2.0+26.3'
+    include(modImplementation('me.lucko:fabric-permissions-api:0.3.1'))
+    modImplementation 'eu.pb4:placeholder-api:2.1.4+1.20.1'
 
     shade(project(':spark-common')) {
         // use the java11+ bytesocks client instead
@@ -54,10 +55,9 @@ dependencies {
 
     shade 'me.lucko:bytesocks-java-client-j11:1.0-SNAPSHOT'
 
-    shade project(':spark-minecraft')
+    shade project(path: ':spark-minecraft', configuration: 'namedElements')
 }
 
-loom.nestJars(tasks.named("shadowJar"), configurations.jarInJar)
 
 processResources {
     // Declared as task inputs. Gradle does not track the values passed to expand(), so
@@ -88,7 +88,7 @@ license {
 }
 
 shadowJar {
-    archiveFileName = "spark-${project.pluginVersion}-fabric.jar"
+    archiveFileName = "spark-fabric-${project.pluginVersion}-dev.jar"
     configurations = [project.configurations.shade]
 
     relocate 'net.kyori.adventure', 'me.lucko.spark.lib.adventure'
@@ -109,6 +109,15 @@ shadowJar {
     mergeServiceFiles()
 }
 
+tasks.register('remappedShadowJar', RemapJarTask) {
+    dependsOn tasks.shadowJar
+    inputFile = tasks.shadowJar.archiveFile
+    addNestedDependencies = true
+    archiveFileName = "spark-${project.pluginVersion}-fabric-1.20.1.jar"
+}
+
+tasks.assemble.dependsOn tasks.remappedShadowJar
+
 artifacts {
-    archives shadowJar
+    archives remappedShadowJar
 }
