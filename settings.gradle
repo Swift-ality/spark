@@ -31,7 +31,9 @@ include (
         'spark-api',
         'spark-bukkit',
         'spark-common',
+        'spark-fabric', // fabric branch
         'spark-geyser',
+        'spark-minecraft', // fabric branch
         'spark-paper',
         'spark-velocity',
 )
